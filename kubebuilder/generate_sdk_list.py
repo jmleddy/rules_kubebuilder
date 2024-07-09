@@ -85,7 +85,7 @@ SDK_VERSION_INTEGRITY = {
 
 
 def checksum_text_to_integrity(text):
-    encoding = base64.b64encode(text.encode())
+    encoding = base64.b64encode(bytes.fromhex(text))
     return "sha512-" + encoding.decode('ascii')
 
 def get_key_containing(keys, word):

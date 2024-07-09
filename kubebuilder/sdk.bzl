@@ -13,10 +13,10 @@ def _kubebuilder_download_sdk_impl(ctx):
         fail("Unknown version {}".format(version))
     integrity = SDK_VERSION_INTEGRITY[version][platform]
     urls = [url.format(version = version, platform = platform) for url in ctx.attr.urls]
-    strip_prefix = ctx.attr.strip_prefix.format(version = version, platform = platform)
+    rename_files = ctx.attr.rename_files
     ctx.download_and_extract(
         url = urls,
-        stripPrefix = strip_prefix,
+        rename_files = rename_files,
         integrity = integrity,
     )
     ctx.template(
@@ -31,14 +31,14 @@ _kubebuilder_download_sdk = repository_rule(
         "version": attr.string(default = "2.3.1"),
         "urls": attr.string_list(
             default = [
-                "https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v{version}/envtest-v{version}_{platform}.tar.gz",
+                "https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v{version}/envtest-v{version}-{platform}.tar.gz",
             ],
         ),
         "rename_files": attr.string_dict(
             default = {
-                "controller-tools/envtest/": "bin/",
+                "./controller-tools/envtest/": "./bin/",
             },
-        },
+        ),
     },
 )
 
@@ -48,13 +48,13 @@ def kubebuilder_download_sdk(name, **kwargs):
 def _detect_host_platform(ctx):
     res = ctx.execute(["uname", "-m"])
     if ctx.os.name == "linux":
-        host = "linux_amd64"
+        host = "linux-amd64"
     elif ctx.os.name == "mac os x" and res.return_code == 0:
         uname = res.stdout.strip()
         if uname == "amd64":
-            host = "darwin_amd64"
+            host = "darwin-amd64"
         elif uname == "arm64":
-            host = "darwin_arm64"
+            host = "darwin-arm64"
         else:
             fail("Unsupported architecture: " + uname)
     else:
