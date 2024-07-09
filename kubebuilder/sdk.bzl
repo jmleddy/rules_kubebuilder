@@ -42,12 +42,17 @@ def kubebuilder_download_sdk(name, **kwargs):
     _kubebuilder_download_sdk(name = name, **kwargs)
 
 def _detect_host_platform(ctx):
+    res = ctx.execute(["uname", "-p"])
     if ctx.os.name == "linux":
         host = "linux_amd64"
-    elif ctx.os.name == "mac os x" and ctx.os.uname.machine == "x86_64":
-        host = "darwin_amd64"
-    elif ctx.os.name == "mac os x" and ctx.os.uname.machine == "arm64":
-        host = "darwin_arm64"
+    elif ctx.os.name == "mac os x" and res.return_code == 0:
+        uname = res.stdout.strip()
+        if uname == "amd64":
+            host = "darwin_amd64"
+        elif uname == "arm64":
+            host = "darwin_arm64"
+        else:
+            fail("Unsupported architecture: " + uname)
     else:
         fail("Unsupported operating system: " + ctx.os.name)
     return host
