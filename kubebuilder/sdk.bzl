@@ -3,21 +3,21 @@
 
 load(
     "@rules_kubebuilder//kubebuilder:sdk_list.bzl",
-    "SDK_VERSION_SHA256",
+    "SDK_VERSION_INTEGRITY",
 )
 
 def _kubebuilder_download_sdk_impl(ctx):
     platform = _detect_host_platform(ctx)
     version = ctx.attr.version
-    if version not in SDK_VERSION_SHA256:
+    if version not in SDK_VERSION_INTEGRITY:
         fail("Unknown version {}".format(version))
-    sha256 = SDK_VERSION_SHA256[version][platform]
+    integrity = SDK_VERSION_INTEGRITY[version][platform]
     urls = [url.format(version = version, platform = platform) for url in ctx.attr.urls]
     strip_prefix = ctx.attr.strip_prefix.format(version = version, platform = platform)
     ctx.download_and_extract(
         url = urls,
         stripPrefix = strip_prefix,
-        sha256 = sha256,
+        integrity = integrity,
     )
     ctx.template(
         "BUILD.bazel",
@@ -31,10 +31,13 @@ _kubebuilder_download_sdk = repository_rule(
         "version": attr.string(default = "2.3.1"),
         "urls": attr.string_list(
             default = [
-                "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v{version}/kubebuilder_{version}_{platform}.tar.gz",
+                "https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v{version}/envtest-v{version}_{platform}.tar.gz",
             ],
         ),
-        "strip_prefix": attr.string(default = "kubebuilder_{version}_{platform}"),
+        "rename_files": attr.string_dict(
+            default = {
+	        "controller-tools/envtest/": "bin/",
+	    },
     },
 )
 
