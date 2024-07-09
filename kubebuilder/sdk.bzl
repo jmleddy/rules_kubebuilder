@@ -16,7 +16,6 @@ def _kubebuilder_download_sdk_impl(ctx):
     strip_prefix = ctx.attr.strip_prefix.format(version = version, platform = platform)
     ctx.download(
         url = urls,
-        stripPrefix = strip_prefix,
         sha256 = sha256,
     )
     ctx.template(
@@ -34,7 +33,6 @@ _kubebuilder_download_sdk = repository_rule(
                 "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v{version}/kubebuilder_{platform}",
             ],
         ),
-        "strip_prefix": attr.string(default = "kubebuilder_{version}_{platform}"),
     },
 )
 
