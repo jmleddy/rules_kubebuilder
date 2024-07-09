@@ -42,7 +42,7 @@ def kubebuilder_download_sdk(name, **kwargs):
     _kubebuilder_download_sdk(name = name, **kwargs)
 
 def _detect_host_platform(ctx):
-    res = ctx.execute(["uname", "-p"])
+    res = ctx.execute(["uname", "-m"])
     if ctx.os.name == "linux":
         host = "linux_amd64"
     elif ctx.os.name == "mac os x" and res.return_code == 0:
