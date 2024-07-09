@@ -3,7 +3,9 @@ import os
 from dataclasses import dataclass
 from tqdm import tqdm
 from typing import List
+import base64
 import json
+import yaml
 
 
 @dataclass
@@ -24,31 +26,34 @@ def fetch_release_items():
         print("You need to get an access token following the instructions in \n https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token")
         exit(1)
     access_token = os.getenv("GH_ACCESS_TOKEN")
-    releases_response = requests.get('https://api.github.com/repos/kubernetes-sigs/kubebuilder/releases', headers={
-        "Accept": "application/vnd.github+json",
+    releases_response = requests.get('https://api.github.com/repos/kubernetes-sigs/controller-tools/contents/envtest-releases.yaml', headers={
+        "Accept": "application/vnd.github.raw+json",
         "Authorization": f"token {access_token}"
     })
 
+    releases_response = releases_response.content.decode("utf-8")
+    releases_response = yaml.safe_load(releases_response)
+
     items = []
-    for release in tqdm(releases_response.json()):
-        checksum_asset = [x for x in release["assets"]
-                          if x["name"] == "checksums.txt"][0]
-        checksum_response = requests.get(
-            checksum_asset["browser_download_url"])
-        checksum_dic = checksum_text_to_dic(checksum_response.text)
-        linux_amd64_key = get_key_containing(
-            list(checksum_dic.keys()), "linux_amd64")
-        darwin_amd64_key = get_key_containing(
-            list(checksum_dic.keys()), "darwin_amd64")
-        darwin_arm64_key = get_key_containing(
-            list(checksum_dic.keys()), "darwin_arm64")
+    for version, tarball in releases_response["releases"].items():
+        linux_amd64_key = ""
+        darwin_amd64_key = ""
+        darwin_arm64_key = ""
+
+        for name, val in tarball.items():
+            if name.endswith("linux-amd64.tar.gz"):
+                linux_amd64_key = checksum_text_to_integrity(val["hash"])
+            if name.endswith("darwin-amd64.tar.gz"):
+                darwin_amd64_key = checksum_text_to_integrity(val["hash"])
+            if name.endswith("darwin-arm64.tar.gz"):
+                darwin_arm64_key = checksum_text_to_integrity(val["hash"])
 
         if darwin_arm64_key:
             items.append(ReleaseItem(
-                release["tag_name"], checksum_dic[linux_amd64_key], checksum_dic[darwin_amd64_key], checksum_dic[darwin_arm64_key]))
+                version, linux_amd64_key, darwin_amd64_key, darwin_arm64_key))
         else:
             items.append(ReleaseItem(
-                release["tag_name"], checksum_dic[linux_amd64_key], checksum_dic[darwin_amd64_key], None))
+                version, linux_amd64_key, darwin_amd64_key, None))
 
     return items
 
@@ -58,20 +63,20 @@ def generate_sdk_list(items: List[ReleaseItem]):
 
 DEFAULT_VERSION = "2.3.1"
 
-SDK_VERSION_SHA256 = {
+SDK_VERSION_INTEGRITY = {
 """
     sdk_dic = {}
     for item in items:
         if item.darwin_arm64_checksum:
             sdk_dic[item.version.replace("v","")] = {
-                "linux_amd64": item.linux_amd64_checksum,
-                "darwin_amd64": item.darwin_amd64_checksum,
-                "darwin_arm64": item.darwin_arm64_checksum,
+                "linux-amd64": item.linux_amd64_checksum,
+                "darwin-amd64": item.darwin_amd64_checksum,
+                "darwin-arm64": item.darwin_arm64_checksum,
             }
         else:
             sdk_dic[item.version.replace("v","")] = {
-                "linux_amd64": item.linux_amd64_checksum,
-                "darwin_amd64": item.darwin_amd64_checksum,
+                "linux-amd64": item.linux_amd64_checksum,
+                "darwin-amd64": item.darwin_amd64_checksum,
             }
     result += remove_first_line(json.dumps(sdk_dic, indent=4))
     with open("sdk_list.bzl", "w") as f:
@@ -79,15 +84,9 @@ SDK_VERSION_SHA256 = {
     print("output: sdk_list.bzl")
 
 
-def checksum_text_to_dic(text):
-    splitted_texts = text.split("\n")
-    result = {}
-    for pair in splitted_texts:
-        split_pair = pair.split("  ")
-        if len(split_pair) == 2:
-            result[split_pair[1]] = split_pair[0]
-    return result
-
+def checksum_text_to_integrity(text):
+    encoding = base64.b64encode(bytes.fromhex(text))
+    return "sha512-" + encoding.decode('ascii')
 
 def get_key_containing(keys, word):
     cands = [key for key in keys if word in key]
