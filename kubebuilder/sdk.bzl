@@ -14,7 +14,7 @@ def _kubebuilder_download_sdk_impl(ctx):
     sha256 = SDK_VERSION_SHA256[version][platform]
     urls = [url.format(version = version, platform = platform) for url in ctx.attr.urls]
     strip_prefix = ctx.attr.strip_prefix.format(version = version, platform = platform)
-    ctx.download_and_extract(
+    ctx.download(
         url = urls,
         stripPrefix = strip_prefix,
         sha256 = sha256,
