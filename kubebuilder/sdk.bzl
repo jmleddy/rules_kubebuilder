@@ -36,8 +36,9 @@ _kubebuilder_download_sdk = repository_rule(
         ),
         "rename_files": attr.string_dict(
             default = {
-	        "controller-tools/envtest/": "bin/",
-	    },
+                "controller-tools/envtest/": "bin/",
+            },
+        },
     },
 )
 
