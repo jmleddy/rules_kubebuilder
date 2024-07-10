@@ -3,7 +3,7 @@ workspace(name = "rules_kubebuilder")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@rules_kubebuilder//kubebuilder:sdk.bzl", "kubebuilder_register_sdk")
 
-kubebuilder_register_sdk(version = "2.3.1")
+kubebuilder_register_sdk(version = "1.30.0")
 
 ## Next section is for testing in this same MP.
 

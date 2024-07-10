@@ -15,7 +15,7 @@ git_repository(
 
 load("@rules_kubebuilder//kubebuilder:sdk.bzl", "kubebuilder_register_sdk")
 
-kubebuilder_register_sdk(version = "2.3.1")
+kubebuilder_register_sdk(version = "1.30.0")
 
 load("@rules_kubebuilder//controller-gen:deps.bzl", "controller_gen_register_toolchain")
 
