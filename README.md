@@ -16,7 +16,6 @@ git_repository(
 load("@rules_kubebuilder//kubebuilder:sdk.bzl", "kubebuilder_register_sdk")
 
 kubebuilder_register_sdk(version = "1.30.0")
-
 load("@rules_kubebuilder//controller-gen:deps.bzl", "controller_gen_register_toolchain")
 
 controller_gen_register_toolchain()
@@ -34,13 +33,32 @@ go_test(
     srcs = ["apackage_test.go"],
     data = [
         "@kubebuilder_sdk//:bin/etcd",
+        "@kubebuilder_sdk//:bin/kube-apiserver",
     ],
+    env = {
+        "KUBEBUILDER_ASSETS": "../../kubebuilder_sdk/bin",
+    },
     embed = [":go_default_library"],
     deps = [
     ],
 )
 ```
-You'll need to run the test as:
+
+You can run the test with:
+
+```shell
+bazel test //...
+```
+
+Unfortunately due to an
+[issue](https://github.com/bazelbuild/bazel/issues/15985) with the way
+bazel refers to relative paths, you must tailor the
+KUBEBUILDER_ASSETS to the particular directory structure of the test
+target. Since in this directory `apackage_test.go` is in the `//test`
+subdir, we must go up one level, and then another level to get to the
+runfiles location where we expect the kubebuilder_sdk data
+directory. If you'd prefer not to have to do this, you can run he old
+way with:
 
 ```shell
 bazel test --test_env=KUBEBUILDER_ASSETS=$(bazel info execution_root 2>/dev/null)/$(bazel run @kubebuilder_sdk//:pwd 2>/dev/null) //...
