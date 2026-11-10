@@ -26,7 +26,7 @@ def _controller_gen_action(ctx, cg_cmd, outputs, output_path):
         gopath = "$(pwd)/" + ctx.bin_dir.path + "/" + ctx.attr.gopath_dep[GoPath].gopath
 
     cmd = """
-          source <($PWD/{godir}/go env) &&
+          eval $($PWD/{godir}/go env) &&
           export PATH=$GOROOT/bin:$PWD/{godir}:$PATH &&
           export GOPATH={gopath} &&
           mkdir -p .gocache &&
@@ -35,11 +35,11 @@ def _controller_gen_action(ctx, cg_cmd, outputs, output_path):
         """.format(
         godir = go_ctx.go.path[:-1 - len(go_ctx.go.basename)],
         gopath = gopath,
-        cmd = "$(pwd)/" + cg_info.controller_gen_bin.path,
-        args = "{cg_cmd} paths={{{files}}} output:dir={outputpath}".format(
+        cmd = "$(pwd)/" + cg_info.controller_gen_bin.executable.path,
+        args = "{cg_cmd} paths={{{files}}} 'output:dir={outputpath}'".format(
             cg_cmd = cg_cmd,
             files = ",".join([f.path for f in ctx.files.srcs]),
-            outputpath = output_path,
+            outputpath = output_path.replace("'", "'\\''"),
         ),
     )
     ctx.actions.run_shell(
@@ -68,7 +68,10 @@ def _env():
     }
 
 def _controller_gen_crd_impl(ctx):
-    outputdir = ctx.actions.declare_directory(ctx.label.name)
+    outputdir = ctx.actions.declare_directory(ctx.attr.out_dir or ctx.label.name)
+    if outputdir.is_directory == False:
+        fail("Output must be a directory")
+
     cg_cmd = "crd"
     extra_args = []
     if ctx.attr.trivialVersions:
@@ -98,7 +101,10 @@ def _controller_gen_object_impl(ctx):
     )
 
 def _controller_gen_rbac_impl(ctx):
-    outputdir = ctx.actions.declare_directory("rbac")
+    outputdir = ctx.actions.declare_directory(ctx.attr.out_dir or "rbac")
+    if outputdir.is_directory == False:
+        fail("Output must be a directory")
+
     cg_cmd = "rbac"
     extra_args = []
     if ctx.attr.roleName:
@@ -113,7 +119,9 @@ def _controller_gen_rbac_impl(ctx):
     )
 
 def _controller_gen_webhook_impl(ctx):
-    outputdir = ctx.actions.declare_directory(ctx.label.name)
+    outputdir = ctx.actions.declare_directory(ctx.attr.out_dir or ctx.label.name)
+    if outputdir.is_directory == False:
+        fail("Output must be a directory")
 
     _controller_gen_action(ctx, "webhook", [outputdir], outputdir.path)
 
@@ -140,10 +148,14 @@ COMMON_ATTRS = {
 }
 
 def _crd_extra_attrs():
-    ret = COMMON_ATTRS
+    ret = dict(COMMON_ATTRS)
     ret.update({
+        "out_dir": attr.string(
+            doc = "Output directory for the CRD files; defaults to the rule name.",
+        ),
         "trivialVersions": attr.bool(
-            default = True,
+            default = False,
+            doc = "Deprecated controller-gen option; enable only for versions that support it.",
         ),
         "preserveUnknownFields": attr.bool(
             default = False,
@@ -156,8 +168,11 @@ def _crd_extra_attrs():
     return ret
 
 def _rbac_extra_attrs():
-    ret = COMMON_ATTRS
+    ret = dict(COMMON_ATTRS)
     ret.update({
+        "out_dir": attr.string(
+            doc = "Output directory for the RBAC files; defaults to rbac.",
+        ),
         "roleName": attr.string(
             default = "manager-role",
         ),
@@ -165,7 +180,12 @@ def _rbac_extra_attrs():
     return ret
 
 def _webhook_extra_attrs():
-    ret = COMMON_ATTRS
+    ret = dict(COMMON_ATTRS)
+    ret.update({
+        "out_dir": attr.string(
+            doc = "Output directory for the webhook files; defaults to the rule name.",
+        ),
+    })
     return ret
 
 def _toolchains():
@@ -179,12 +199,12 @@ _controller_gen_crd = rule(
     attrs = _crd_extra_attrs(),
     toolchains = _toolchains(),
     doc = "Run the CRD generating portion of controller-gen. " +
-          "The output directory will be the name of the rule.",
+          "The output directory defaults to the name of the rule.",
 )
 
 _controller_gen_object = rule(
     implementation = _controller_gen_object_impl,
-    attrs = COMMON_ATTRS,
+    attrs = dict(COMMON_ATTRS),
     toolchains = _toolchains(),
     doc = "Run the code generating portion of controller-gen. " +
           "You can use the name of this rule as part of the `srcs` attribute " +
@@ -196,7 +216,7 @@ _controller_gen_rbac = rule(
     attrs = _rbac_extra_attrs(),
     toolchains = _toolchains(),
     doc = "Run the role binding generating portion of controller-gen. " +
-          "The output directory will be `rbac`.",
+          "The output directory defaults to `rbac`.",
 )
 
 _controller_gen_webhook = rule(
@@ -204,7 +224,7 @@ _controller_gen_webhook = rule(
     attrs = _webhook_extra_attrs(),
     toolchains = _toolchains(),
     doc = "Run the webhook generating portion of controller-gen. " +
-          "The output directory will be the name of the rule.",
+          "The output directory defaults to the name of the rule.",
 )
 
 def _maybe_add_gopath_dep(name, kwargs):
@@ -228,7 +248,7 @@ def controller_gen_object(name, **kwargs):
 def controller_gen_rbac(name, **kwargs):
     _maybe_add_gopath_dep(name, kwargs)
     _controller_gen_rbac(name = name, **kwargs)
-    
+
 def controller_gen_webhook(name, **kwargs):
     _maybe_add_gopath_dep(name, kwargs)
     _controller_gen_webhook(name = name, **kwargs)

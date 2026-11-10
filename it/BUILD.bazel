@@ -1,0 +1,133 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@rules_kubebuilder//controller-gen:controller-gen.bzl", "controller_gen_crd", "controller_gen_object", "controller_gen_rbac", "controller_gen_webhook")
+
+platform(
+    name = "linux_arm64_target",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+sh_binary(
+    name = "controller_gen_wrapper",
+    srcs = ["controller_gen_wrapper.sh"],
+    data = ["@io_k8s_sigs_controller_tools//cmd/controller-gen"],
+    visibility = ["//visibility:public"],
+)
+
+controller_gen_crd(
+    name = "generate_crds",
+    srcs = ["//api/v1alpha1:src"],
+    out_dir = "config/crd",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_rbac(
+    name = "generate_rbac",
+    srcs = ["//api/v1alpha1:src"],
+    out_dir = "config/rbac",
+    roleName = "manager-role",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_webhook(
+    name = "generate_webhook",
+    srcs = ["//api/v1alpha1:src"],
+    out_dir = "config/webhook",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_crd(
+    name = "legacy_crds",
+    srcs = ["//api/v1alpha1:src"],
+    trivialVersions = False,
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_crd(
+    name = "spaced_output",
+    srcs = ["//api/v1alpha1:src"],
+    out_dir = "generated manifests/crd",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_rbac(
+    name = "legacy_rbac",
+    srcs = ["//api/v1alpha1:src"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+controller_gen_webhook(
+    name = "legacy_webhook",
+    srcs = ["//api/v1alpha1:src"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_sigs_controller_runtime//pkg/scheme:go_default_library",
+    ],
+)
+
+sh_test(
+    name = "controller_gen_test",
+    size = "small",
+    srcs = ["controller_gen_test.sh"],
+    args = [
+        "$(rootpath :generate_crds)",
+        "$(rootpath :generate_rbac)",
+        "$(rootpath :generate_webhook)",
+        "$(rootpath //api/v1alpha1:generate_objects)",
+        "$(rootpath :legacy_crds)",
+        "$(rootpath :legacy_rbac)",
+        "$(rootpath :legacy_webhook)",
+        "$(rootpath :spaced_output)",
+    ],
+    data = [
+        ":generate_crds",
+        ":generate_rbac",
+        ":generate_webhook",
+        "//api/v1alpha1:generate_objects",
+        ":legacy_crds",
+        ":legacy_rbac",
+        ":legacy_webhook",
+        ":spaced_output",
+    ],
+)
+
+gazelle(
+    name = "gazelle-update-repos",
+    args = [
+        "-from_file=go.mod",
+        "-build_file_generation=on",
+        "-build_file_proto_mode=disable",
+        "-prune=true",
+    ],
+    command = "update-repos",
+)
+
+gazelle(
+    name = "gazelle",
+)
+
+alias(
+    name = "go",
+    actual = "@go_sdk//:bin/go",
+    visibility = ["//visibility:public"],
+)
